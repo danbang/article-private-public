@@ -50,6 +50,7 @@ for i_roi= 1:length(my_ROIs);
     % statistics
     load([scanDir,fs,my_ROIs{i_roi},'_ContrastEstimates.mat']);
     my_data= contrastEstimates;
+    beta{i_roi}= my_data;
     muz= mean(my_data);
     sem= std(my_data)/sqrt(n_subjects);
     % plot bars
