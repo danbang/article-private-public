@@ -1,13 +1,13 @@
 % Bang et al (2020) Private-public mappings in human prefrontal cortex
 %
-% Reproduces Figure 4-figure supplement 2
+% Reproduces Figure 4-figure supplement 1
 %
 % "Private confidence" is computed by training multinomial regression on
 % data from prescan session and then applying weights to data from fMRI
 % session while setting context weights to zero
 %
-% Visualises private confidence under fitted model as a function of motion 
-% coherence and choice reaction time
+% Visualises cross-validation accuracy within date used to fit the
+% confidence model (phase 3 in behavioural session)
 %
 % Dan Bang danbang.db@gmail.com 2020
 
@@ -33,17 +33,20 @@ addpath('Functions');
 % ROIs
 my_ROIs= {'dACC','pgACC','FPl'};
 
-%% -----------------------------------------------------------------------
-%% COMPUTE PRIVATE CONFIDENCE
+% -----------------------------------------------------------------------
+% CROSS-VALIDATION
 
 % Loop through subjects
 for s= 1:n_subjects;
     
-    % Load stimulus and context specifications
+    %% Customer service
+    fprintf(['Cross-validating: subject ',num2str(s),' out of ',num2str(n_subjects),'\n']);
+    
+    %% Load stimulus and context specifications
     load([prescanBDir,fs,'s',num2str(s),'_stimulus.mat']);
     load([prescanBDir,fs,'s',num2str(s),'_context.mat']);
     
-    %% FIRST FIT MODEL USING PRESCAN DATA PHASE 3 (SAME SETUP AS IN FMRI)
+    %% Load behavioural data
 
     % Load file
     load([prescanBDir,fs,'s',num2str(s),'_social3.mat']);    
@@ -58,29 +61,14 @@ for s= 1:n_subjects;
     for t= 1:length(data.trial);
         data.context(t)= context_v(data.advcat(t));
     end
-  
-    % Fit multinomial regression
-    % Load variables
-    confidence= data.con;
-    coherence= data.cohcat-2.5;
-    reactiontime= log(data.rt1);
-    context1= data.context==1;
-    context2= data.context==2;
-    context3= data.context==3;
-    context4= data.context==4;
-    context5= data.context==5;
-    % Predictors
-    X= [coherence; reactiontime; ...
-        context1; context2; context3; context4]';
-    % Outcome
-    Y= 7-confidence;
-    % Fit and save predictor weights
-    [B,~,STATS] = mnrfit(X,Y,'model','ordinal','link','probit');
-    betas{s}= B;
-        
-    %% THEN USE FITTED MODEL TO DERIVE ESTIMATES FOR SCAN DATA
-
+    
+    % Save data
+    Bdata= data;
+    
+    %% Load fMRI data
+    
     % Collate data from scan runs
+    tmp= [];
     for i_r= 1:4;       
         % Load file
         load([scanBDir,fs,'s',num2str(s),'_social_run',num2str(i_r),'.mat']);    
@@ -112,34 +100,91 @@ for s= 1:n_subjects;
         data.context(t)= context_v(data.advcat(t));
     end
     
-    % Visualise prediction
-    coh_v= [1:4]-2.5;
-    rt1_v= quantile(log(data.rt1),10);
-    for i_coh= 1:length(coh_v);
-        for i_rt1= 1:length(rt1_v);
-            % Predictors
-            X= [coh_v(i_coh); rt1_v(i_rt1); 0; 0; 0; 0;]';
-            % Apply fitted weights
-            Yhat= mnrval(betas{s},X,'model','ordinal','link','probit');
-            % Save prediction (i.e. expectation under fitted weights)
-            visualz(i_coh,i_rt1,s)= 7-sum(repmat([1:6],size(Yhat,1),1).*Yhat,2);
+    % Save data
+    Fdata= data;
+    
+    %% Cross-validation: within behavioural session
+        
+    % Re-assign data
+    data= Bdata;
+    
+    % Create trial indices
+    trial_v= 1:length(data.trial);
+    
+    % Loop through trials
+    for i_trial= trial_v;
+        
+        % Divide trial indices
+        train_trial= trial_v(trial_v~=i_trial);
+        test_trial= trial_v(trial_v==i_trial);
+        
+        % Fit multinomial regression
+        % Specify variables
+        confidence= data.con(train_trial);
+        coherence= data.cohcat(train_trial)-2.5;
+        reactiontime= log(data.rt1(train_trial));
+        context1= data.context(train_trial)==1;
+        context2= data.context(train_trial)==2;
+        context3= data.context(train_trial)==3;
+        context4= data.context(train_trial)==4;
+        context5= data.context(train_trial)==5;
+        % Predictor matrix
+        X= [coherence; reactiontime; context1; context2; context3; context4]';
+        % Outcome variable
+        Y= 7-confidence;
+        % Evaluate model
+        B = mnrfit(X,Y,'model','ordinal','link','probit');
+        
+        % Cross-validate multinomial regression
+        % Specify variables
+        confidence= data.con(test_trial);
+        coherence= data.cohcat(test_trial)-2.5;
+        reactiontime= log(data.rt1(test_trial));
+        context1= data.context(test_trial)==1;
+        context2= data.context(test_trial)==2;
+        context3= data.context(test_trial)==3;
+        context4= data.context(test_trial)==4;
+        context5= data.context(test_trial)==5;
+        % Predictor matrix
+        X= [coherence; reactiontime; context1; context2; context3; context4]';
+        % Outcome variable
+        Y= 7-confidence;
+        % Evaluate model
+        Ymodel= mnrval(B,X,'model','ordinal','link','probit');
+        Ynull= ones(size(Y,1),6)./6;
+        % Padding if response option not used
+        unique_Y= unique(data.con(train_trial));
+        if length(unique_Y)< 6;
+            if unique_Y(1)==2 || unique_Y(end)==5;
+                tmp= zeros(size(Y,1),6);
+                tmp(:,unique_Y)= Ymodel;
+                Ymodel= tmp;
+            end
         end
+        % Avoid zero probability
+        zeroPadd= .01;
+        Ymodel= (Ymodel+zeroPadd)./sum(Ymodel+zeroPadd);
+        % Vectorise outcome variable
+        Yvec= zeros(size(Y,1),6);
+        for t=1:size(Yvec,1); Yvec(t,Y(t))=1; end
+        % Compute log likelihoods
+        LLmodel= sum(log(mnpdf(Yvec,Ymodel)));
+        LLnull= sum(log(mnpdf(Yvec,Ynull)));
+        crossvalLL{s}(i_trial,:)= [LLnull LLmodel];
     end
+         
 end
 
-%% Plot visualisation
+%% Plot cross-validation
 figure('color',[1 1 1]);
-colz= [.75 .75 .75; .5 .5 .5; .25 .25 .25; 0 0 0];
-group= mean(visualz,3);
-for i_c= 1:4;
-    plot(group(i_c,:),'-','Color',colz(i_c,:),'LineWidth',4); hold on;
-end
+for s= 1:n_subjects; crossvalDelta(s)= (-sum(crossvalLL{s}(:,1)))-(-sum(crossvalLL{s}(:,2))); end
+bar(sort(crossvalDelta,'ascend'),'Facecolor','m','Edgecolor','w','FaceAlpha',.4); hold on;
+plot([0 n_subjects+1],[0 0],'k-','LineWidth',4);
 set(gca,'FontSize',34,'LineWidth',4);
-set(gca,'XTick',1:10);
-set(gca,'YTick',2.5:.5:5.5)
-xlabel('RT quantile','FontSize',44);
-ylabel('private confidence','FontSize',44);
-xlim([.5 10.5]);
-ylim([2.2 4.8]);
+set(gca,'XTick',[]);
+set(gca,'YTick',0:25:200);
+xlabel('subject','FontSize',44);
+ylabel('-LL model-null','FontSize',44);
+% title('cross-validation','FontSize',24,'FontWeight','normal');
 box off;
-print('-djpeg','-r300',['Figures',filesep,'Figure4_S2']);
+print('-djpeg','-r300',['Figures',filesep,'Figure4_S1']);
