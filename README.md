@@ -2,7 +2,7 @@
 
 This repository contains anonymised behavioural and neural data and code supporting:
 
-<a href="https://doi.org/10.1101/2020.02.21.954305">Bang, Ershadmanesh, Nili & Fleming (2020) “Private-public mappings in human  prefrontal cortex” bioRxiv</a>
+<a href="https://elifesciences.org/articles/56477">Bang, Ershadmanesh, Nili & Fleming (2020) “Private-public mappings in human  prefrontal cortex” eLife</a>
 
 FigureX.m files will generate the specified plots and associated statistical analyses.
 
