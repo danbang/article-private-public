@@ -4,7 +4,7 @@ This repository contains anonymised behavioural and neural data and code support
 
 <a href="https://elifesciences.org/articles/56477">Bang, Ershadmanesh, Nili & Fleming (2020) “Private-public mappings in human  prefrontal cortex” eLife</a>
 
-FigureX.m files will generate the specified plots and associated statistical analyses.
+FigureX.m files will generate the requested plots and associated statistical analyses.
 
 The paths in these scripts require altering the directory variable ‘repoBase’ to point to your local version of the repository.
 
