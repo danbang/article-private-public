@@ -1,6 +1,6 @@
 # article-private-public
 
-This repository contains anonymised behavioural and neural data and code supporting:
+This repository contains anonymised data and code supporting:
 
 <a href="https://elifesciences.org/articles/56477">Bang, Ershadmanesh, Nili & Fleming (2020) “Private-public mappings in human  prefrontal cortex” eLife</a>
 
