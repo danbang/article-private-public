@@ -43,3 +43,5 @@ end
 % summary measures
 maxent.cmean= sanity;
 maxent.cdist= max_entrop_conf_dist;
+
+save('maxent_cdist', 'maxent');
